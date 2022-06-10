@@ -2,6 +2,13 @@ import streamlit as st
 import pandas as pd
 import os
 
+# Location of data files
+DATA_ROOT = os.path.join('.', 'data')
+DATA_STATES_COMBINED_WS = os.path.join(DATA_ROOT, 'fppe_data_combined.xlsx')
+DATA_STATES_RURAL_WS = os.path.join(DATA_ROOT, 'fppe_data_rural.xlsx')
+DATA_STATES_URBAN_WS = os.path.join(DATA_ROOT, 'fppe_data_urban.xlsx')
+DATA_DISTRICTS_WS = os.path.join(DATA_ROOT, 'fppe_data_districts.xlsx')
+
 st.set_page_config(
      page_title="Family Planning Performance Explorer",
      layout="wide",
@@ -13,12 +20,7 @@ st.set_page_config(
      }
  )
 
-# Location of data files
-DATA_ROOT = os.path.join('.', 'data')
-DATA_STATES_COMBINED_WS = os.path.join(DATA_ROOT, 'fppe_data_combined.xslx')
-DATA_STATES_RURAL_WS = os.path.join(DATA_ROOT, 'fppe_data_rural.xslx')
-DATA_STATES_URBAN_WS = os.path.join(DATA_ROOT, 'fppe_data_urban.xslx')
-DATA_DISTRICTS_WS = os.path.join(DATA_ROOT, 'fppe_data_districts.xslx')
+print(DATA_STATES_COMBINED_WS)
 
 st.sidebar.write("## Family Planning Performance Explorer")
 st.sidebar.write("***")
