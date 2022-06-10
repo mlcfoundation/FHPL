@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import os
 
 st.set_page_config(
      page_title="Family Planning Performance Explorer",
@@ -12,6 +13,13 @@ st.set_page_config(
      }
  )
 
+# Location of data files
+DATA_ROOT = os.path.join('.', 'data')
+DATA_STATES_COMBINED_WS = os.path(DATA_ROOT, 'fppe_data_combined.xslx')
+DATA_STATES_RURAL_WS = os.path(DATA_ROOT, 'fppe_data_rural.xslx')
+DATA_STATES_URBAN_WS = os.path(DATA_ROOT, 'fppe_data_urban.xslx')
+DATA_DISTRICTS_WS = os.path(DATA_ROOT, 'fppe_data_districts.xslx')
+
 st.sidebar.write("## Family Planning Performance Explorer")
 st.sidebar.write("***")
 st.sidebar.write('## District & State Comparison')
@@ -23,7 +31,7 @@ st.sidebar.write('Copyright (C) **MLC Foundation**. *All rights reserved.*')
 
 @st.cache
 def load_combined_data():
-    return pd.read_excel('./fppe_data_combined.xlsx', header=[1,2,3], index_col=0)
+    return pd.read_excel(DATA_STATES_COMBINED_WS, header=[1,2,3], index_col=0)
 df = load_combined_data()
 
 methods = df.columns.get_level_values(0).drop_duplicates()
