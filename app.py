@@ -17,7 +17,7 @@ st.set_page_config(
 DATA_ROOT = os.path.join('.', 'data')
 DATA_STATES_COMBINED_WS = os.path.join(DATA_ROOT, 'fppe_data_combined.xslx')
 DATA_STATES_RURAL_WS = os.path.join(DATA_ROOT, 'fppe_data_rural.xslx')
-DATA_STATES_URBAN_WS = os.path.join.(DATA_ROOT, 'fppe_data_urban.xslx')
+DATA_STATES_URBAN_WS = os.path.join(DATA_ROOT, 'fppe_data_urban.xslx')
 DATA_DISTRICTS_WS = os.path.join(DATA_ROOT, 'fppe_data_districts.xslx')
 
 st.sidebar.write("## Family Planning Performance Explorer")
