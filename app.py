@@ -1,8 +1,8 @@
-from unicodedata import category
-from pyrsistent import m
+import plotly.express as pex
 import streamlit as st
 import pandas as pd
 import os
+import json
 
 # Data Options
 DATA_OPTIONS = {
@@ -63,9 +63,9 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
     menu_items={
-        'Get Help': 'https://github.com/mlcfoundation/NFHS/issues',
-        'Report a bug': "https://github.com/mlcfoundation/NFHS/issues",
-        'About': "# NFHS-5 District Indicators Comparison App"
+        'Get Help': 'https://github.com/mlcfoundation/FPPE/issues',
+        'Report a bug': "https://github.com/mlcfoundation/FPPE/issues",
+        'About': "# Family Planning Performance Exporer App"
     }
  )
 
@@ -86,6 +86,21 @@ def load_data():
     df4 = pd.read_excel(DATA_DISTRICTS_WS, header=[0,1,2], index_col=[0,1])
     return (df1,df2,df3,df4)
 swcd_df, swrd_df, swud_df, dwcd_df = load_data()
+
+#@st.cache
+def load_states_geo():
+    f = open(os.path.join(DATA_ROOT, 'india_states.geojson'))
+    return json.load(f)
+states_geo = load_states_geo()
+
+#@st.cache
+def load_districts_geo():
+    f = open(os.path.join(DATA_ROOT, 'india_districts.geojson'))
+    return json.load(f)
+districts_geo = load_districts_geo()
+
+def download_as_csv(df):
+    return df.to_csv().encode('utf-8')
 
 @st.cache
 def build_dimensions(df):
@@ -116,7 +131,19 @@ categories = swcd_df.columns.get_level_values(0).drop_duplicates()
 methods    = swcd_df.columns.get_level_values(1).drop_duplicates()
 periods    = swcd_df.columns.get_level_values(2).drop_duplicates()
 
-#with st.expander('Indicators', expanded=True):
+# Options
+#opt_table = True
+#opt_chart = False
+#opt_map = False
+with st.expander('Options', expanded=False):
+    c1,c2,c3 = st.columns(3)
+    with c1:
+        opt_table = st.checkbox('Table', value=True, help='Show data in a table')
+    with c2:
+        opt_chart = st.checkbox('Chart', value=False, help='Show data in a bar chart')
+    with c3:
+        opt_map = st.checkbox('Map', value=False, help='Show data on a map')
+
 # Populate dimensions
 s_dims = st.multiselect('Dimensions', dim.keys(), help='Select dimensions')
 
@@ -144,17 +171,37 @@ s_districts = st.multiselect('Districts', list(d.index.get_level_values(1).array
 # Periods are fixed so can be populated from any state/district level DF
 s_periods = st.multiselect('Period', list(periods.array), help='Select period')
 
-# Query DF
+# Query DF (we need state to be selected)
 if len(s_states):
     if len(s_districts):
         res = dwcd_df.query("State == @s_states")
     else:
         res = swcd_df.query("State == @s_states")
 
+    # Filter districts (if selected)
     if len(s_districts):
         res = res.query('District == @s_districts')
 
+    # Make sure we have all the parameters
     if len(s_dims) and len(s_inds) and len(s_periods):
-        print(s_states, s_dims, s_inds, s_periods)
         res = res.loc[:,(s_dims, s_inds, s_periods)]
-        st.dataframe(res)
+
+        # Check if districts are selected
+        if len(s_districts):
+            # Flatten index
+            res.index = [ ', '.join(i).rstrip('_') for i in res.index.values ]
+
+        # Flatten columns
+        res.columns = [ ', '.join(c).rstrip('_') for c in res.columns.values ]
+
+        with st.expander(label='Table', expanded=True):
+            if opt_table:
+                st.table(res)
+                st.download_button('Download as CSV', download_as_csv(res), 'FPPE.csv', 'text/csv', key='download-csv')
+
+        with st.expander(label='Chart', expanded=True):
+            if opt_chart:
+                chart = pex.bar(res, text_auto=True, orientation='v', barmode='group')
+                chart.update_layout(font_family='helvetica')
+                st.plotly_chart(chart, use_container_width=True)
+
