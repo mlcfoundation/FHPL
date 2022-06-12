@@ -69,21 +69,28 @@ st.set_page_config(
     }
  )
 
+TEXT1 = "This app is developed by *[MLC Foundation](https://www.mlcfoundation.org.in/)*"
+TEXT2 = "Please contact Aalok Ranjan *<aalok@mlcfoundation.org.in>* or "\
+        "Akshay Ranjan *<akshay@mlcfoundation.org.in>* for any help, "\
+        "suggestions, questions, etc."
+TEXT3 = "This is an open source application and code can be found at "\
+        "*[github.com](https://github.com/mlcfoundation/FPPE)*. Report bugs "\
+        "*[here](https://github.com/mlcfoundation/FPPE/issues)*."
+
 st.sidebar.write("## Family Planning Performance Explorer")
 st.sidebar.write("***")
-st.sidebar.write('## District & State Comparison')
-#st.sidebar.write(TEXT1)
-#st.sidebar.write(TEXT2)
-#st.sidebar.write(TEXT3)
+st.sidebar.write(TEXT1)
+st.sidebar.write(TEXT2)
+st.sidebar.write(TEXT3)
 st.sidebar.write("***")
 st.sidebar.write('Copyright (C) **MLC Foundation**. *All rights reserved.*')
 
 @st.cache
 def load_data():
-    df1 = pd.read_excel(DATA_STATES_COMBINED_WS, header=[0,1,2], index_col=0)
-    df2 = pd.read_excel(DATA_STATES_RURAL_WS, header=[0,1,2], index_col=0)
-    df3 = pd.read_excel(DATA_STATES_URBAN_WS, header=[0,1,2], index_col=0)
-    df4 = pd.read_excel(DATA_DISTRICTS_WS, header=[0,1,2], index_col=[0,1])
+    df1 = pd.read_excel(DATA_STATES_COMBINED_WS, header=[1,2,3], index_col=0)
+    df2 = pd.read_excel(DATA_STATES_RURAL_WS, header=[1,2,3], index_col=0)
+    df3 = pd.read_excel(DATA_STATES_URBAN_WS, header=[1,2,3], index_col=0)
+    df4 = pd.read_excel(DATA_DISTRICTS_WS, header=[1,2,3], index_col=[0,1])
     return (df1,df2,df3,df4)
 swcd_df, swrd_df, swud_df, dwcd_df = load_data()
 
@@ -158,15 +165,24 @@ for k in filetered_ind.keys():
 # Populate indicators
 s_inds = st.multiselect('Methods', ind, help='Select methods')
 
-#with st.expander('Particulars', expanded=True):
-# Populates list of states from any state level DF (easier)
-s_states = st.multiselect('States', states, help='Select states')
+# All states?
+if st.checkbox('All states'):
+    # All states are selected
+    s_states = list(dwcd_df.index.get_level_values(0).array)
+else:
+    # Populates list of states from any state level DF (easier)
+    s_states = st.multiselect('States', states, help='Select states')
 
 # Run a query on the district level DF to select only rows matching the selected states
 d = dwcd_df.query('State == @s_states')
 
-# Populate list of districts based on result of query above
-s_districts = st.multiselect('Districts', list(d.index.get_level_values(1).array), help='Select districts')
+# All districts?
+if st.checkbox('All districts'):
+    # All districts of selected states
+    s_districts = list(d.index.get_level_values(1).array)
+else:
+    # Populate list of districts based on result of query above
+    s_districts = st.multiselect('Districts', list(d.index.get_level_values(1).array), help='Select districts')
 
 # Periods are fixed so can be populated from any state/district level DF
 s_periods = st.multiselect('Period', list(periods.array), help='Select period')
@@ -186,22 +202,86 @@ if len(s_states):
     if len(s_dims) and len(s_inds) and len(s_periods):
         res = res.loc[:,(s_dims, s_inds, s_periods)]
 
-        # Check if districts are selected
-        if len(s_districts):
-            # Flatten index
-            res.index = [ ', '.join(i).rstrip('_') for i in res.index.values ]
-
         # Flatten columns
         res.columns = [ ', '.join(c).rstrip('_') for c in res.columns.values ]
 
         with st.expander(label='Table', expanded=True):
             if opt_table:
-                st.table(res)
-                st.download_button('Download as CSV', download_as_csv(res), 'FPPE.csv', 'text/csv', key='download-csv')
+                # Deep copy DF if map is also enabled
+                tres = res.copy(deep=True) if opt_map else res
+                
+                # Check if districts are selected
+                if len(s_districts):
+                    # Flatten index
+                    tres.index = [ ', '.join(i).rstrip('_') for i in tres.index.values ]
+
+                st.table(tres)
+                st.download_button('Download as CSV', download_as_csv(tres), 'FPPE.csv', 'text/csv', key='download-csv')
 
         with st.expander(label='Chart', expanded=True):
             if opt_chart:
-                chart = pex.bar(res, text_auto=True, orientation='v', barmode='group')
+                # Deep copy DF if map is also enabled
+                cres = res.copy(deep=True) if opt_map else res
+                
+                # Check if districts are selected
+                if len(s_districts):
+                    # Flatten index
+                    cres.index = [ ', '.join(i).rstrip('_') for i in cres.index.values ]
+
+                chart = pex.bar(cres, text_auto=True, orientation='v', barmode='group')
                 chart.update_layout(font_family='helvetica')
                 st.plotly_chart(chart, use_container_width=True)
+
+        with st.expander(label='Map', expanded=True):
+            if opt_map:
+                if len(s_districts):
+                    if len(res.columns) == 1:
+                        nres = res.reset_index()
+                        print(nres)
+                        data_color = nres[nres.columns[2]]
+                        r_max = nres[nres.columns[2]].max()
+                        r_min = nres[nres.columns[2]].min()
+
+                        # Use mapbox
+                        pex.set_mapbox_access_token(st.secrets['mapbox']['key'])
+                        chart = pex.choropleth_mapbox(nres, 
+                                                      geojson=districts_geo,
+                                                      locations='District',
+                                                      color=data_color,
+                                                      range_color=(r_max, r_min),
+                                                      color_continuous_scale='spectral_r',
+                                                      featureidkey='properties.NAME_2',
+                                                      mapbox_style='light',
+                                                      center={"lat": 22, "lon": 82},
+                                                      zoom=3.85,
+                                                      width=900,
+                                                      height=950)
+                        st.plotly_chart(chart)
+                else:
+                    if len(res.columns) == 1:
+                        nres = res.reset_index()
+                        data_color = nres[nres.columns[1]]
+                        r_max = nres[nres.columns[1]].max()
+                        r_min = nres[nres.columns[1]].min()
+
+                        # Use mapbox
+                        pex.set_mapbox_access_token(st.secrets['mapbox']['key'])
+                        chart = pex.choropleth_mapbox(nres, 
+                                                      geojson=states_geo,
+                                                      locations='State',
+                                                      color=data_color,
+                                                      range_color=(r_max, r_min),
+                                                      color_continuous_scale='spectral_r',
+                                                      featureidkey='properties.NAME_1',
+                                                      mapbox_style='light',
+                                                      center={"lat": 22, "lon": 82},
+                                                      zoom=3.85,
+                                                      width=900,
+                                                      height=950)
+                        st.plotly_chart(chart)
+                
+
+
+
+
 
