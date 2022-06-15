@@ -237,7 +237,7 @@ if len(s_states):
                 if len(s_districts):
                     if len(res.columns) == 1:
                         nres = res.reset_index()
-                        print(nres)
+
                         data_color = nres[nres.columns[2]]
                         r_max = nres[nres.columns[2]].max()
                         r_min = nres[nres.columns[2]].min()
@@ -256,10 +256,11 @@ if len(s_states):
                                                       zoom=3.85,
                                                       width=900,
                                                       height=950)
-                        st.plotly_chart(chart)
+                        st.plotly_chart(chart, use_container_width=True)
                 else:
                     if len(res.columns) == 1:
                         nres = res.reset_index()
+
                         data_color = nres[nres.columns[1]]
                         r_max = nres[nres.columns[1]].max()
                         r_min = nres[nres.columns[1]].min()
@@ -278,7 +279,7 @@ if len(s_states):
                                                       zoom=3.85,
                                                       width=900,
                                                       height=950)
-                        st.plotly_chart(chart)
+                        st.plotly_chart(chart, use_container_width=True)
                 
 
 
