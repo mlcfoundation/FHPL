@@ -19,45 +19,6 @@ DATA_STATES_RURAL_WS = os.path.join(DATA_ROOT, DATA_OPTIONS['State-wise Rural'])
 DATA_STATES_URBAN_WS = os.path.join(DATA_ROOT, DATA_OPTIONS['State-wise Urban'])
 DATA_DISTRICTS_WS = os.path.join(DATA_ROOT, DATA_OPTIONS['District-wise Combined'])
 
-# Map state code with state names
-STATE_CODE_TO_STR = {
-    'AN': 'Andaman & Nicobar',
-    'AP': 'Andhra Pradesh',
-    'AR': 'Arunachal Pradesh',
-    'AS': 'Assam',
-    'BI': 'Bihar',
-    'CD': 'Chandigarh',
-    'CH': 'Chhattisgarh',
-    'DE': 'Delhi',
-    'DN': 'Dadra & Nagar Haveli and Daman & Diu',
-    'GO': 'Goa',
-    'GU': 'Gujarat',
-    'HA': 'Harayana',
-    'HP': 'Himachal Pradesh',
-    'JA': 'Jammu & Kashmir',
-    'JH': 'Jharkhand',
-    'KA': 'Karnataka',
-    'KE': 'Kerala',
-    'LA': 'Ladakh',
-    'LK': 'Lakshadweep',
-    'MA': 'Madhya Pradesh',
-    'MH': 'Maharashtra',
-    'MN': 'Manipur',
-    'MY': 'Meghalaya',
-    'MZ': 'Mizoram',
-    'NG': 'Nagaland',
-    'OD': 'Odissa',
-    'PU': 'Punjab',
-    'RA': 'Rajasthan',
-    'SI': 'Sikkim',
-    'TA': 'Tamil Nadu',
-    'TE': 'Telangana',
-    'TR': 'Tripura',
-    'UP': 'Uttar Pradesh',
-    'UT': 'Uttarakhand',
-    'WB': 'West Bengal'
-}
-
 st.set_page_config(
     page_title="Family Planning Performance Explorer",
     layout="wide",
@@ -68,6 +29,9 @@ st.set_page_config(
         'About': "# Family Planning Performance Exporer App"
     }
  )
+
+#with open( "style.css" ) as css:
+#    st.markdown( f'<style>{css.read()}</style>' , unsafe_allow_html= True)
 
 TEXT1 = "This app is developed by *[MLC Foundation](https://www.mlcfoundation.org.in/)*"
 TEXT2 = "Please contact Aalok Ranjan *<aalok@mlcfoundation.org.in>* or "\
@@ -85,7 +49,7 @@ st.sidebar.write(TEXT3)
 st.sidebar.write("***")
 st.sidebar.write('Copyright (C) **MLC Foundation**. *All rights reserved.*')
 
-@st.cache
+@st.experimental_singleton
 def load_data():
     df1 = pd.read_excel(DATA_STATES_COMBINED_WS, header=[1,2,3], index_col=0)
     df2 = pd.read_excel(DATA_STATES_RURAL_WS, header=[1,2,3], index_col=0)
@@ -94,22 +58,53 @@ def load_data():
     return (df1,df2,df3,df4)
 swcd_df, swrd_df, swud_df, dwcd_df = load_data()
 
-#@st.cache
+@st.experimental_singleton
+# Open states geo
 def load_states_geo():
-    f = open(os.path.join(DATA_ROOT, 'india_states.geojson'))
-    return json.load(f)
+    f_states = open(os.path.join(DATA_ROOT, 'STATE_BOUNDARY.json'))
+    return json.load(f_states)
 states_geo = load_states_geo()
 
-#@st.cache
+@st.experimental_singleton
+# Open districts geo
 def load_districts_geo():
-    f = open(os.path.join(DATA_ROOT, 'india_districts.geojson'))
-    return json.load(f)
-districts_geo = load_districts_geo()
+    f_districts = open(os.path.join(DATA_ROOT, 'DISTRICT_BOUNDARY.json'))
+    geo = json.load(f_districts)
+    features = geo['features']
+    fda = {}
+    fsa = {}
+
+    for feature in features:
+        d_name = feature['properties']['District']
+        d_id = feature['properties']['DISTRICT_L']
+        s_name = feature["properties"]['STATE']
+        s_id = feature['properties']['State_LGD']
+
+        if not d_name.startswith('DISPUTED'):
+            # fda[d_name.replace('>','A').replace('|', 'I').replace('@','U')] = {
+            #    "id": d_id,
+            #    "state": s_name.replace('>','A').replace('|', 'I').replace('@','U'),
+            #    "state_id": s_id
+            # }
+            fda[d_name] = {
+                "id": d_id,
+                "state": s_name,
+                'state_id': s_id
+            }
+        if not s_name.startswith('DISPUTED'):
+            #if s_name.replace('>','A').replace('|', 'I').replace('@','U') not in fsa.keys():
+            #    fsa[s_name.replace('>','A').replace('|', 'I').replace('@','U')] = s_id
+            if s_name not in fsa.keys():
+                fsa[s_name] = s_id
+    
+    return geo, { 'States': fsa, 'Districts': fda }
+districts_geo, names = load_districts_geo()
+#print(names)
 
 def download_as_csv(df):
     return df.to_csv().encode('utf-8')
 
-@st.cache
+@st.experimental_singleton
 def build_dimensions(df):
     dim = {}
 
@@ -242,15 +237,20 @@ if len(s_states):
                         r_max = nres[nres.columns[2]].max()
                         r_min = nres[nres.columns[2]].min()
 
+                        # Add district indice
+                        nres['District_ID'] = nres.apply(lambda row: names['Districts'][row.District.upper()]['id'], axis=1)
+
+                        print(nres)
+
                         # Use mapbox
                         pex.set_mapbox_access_token(st.secrets['mapbox']['key'])
                         chart = pex.choropleth_mapbox(nres, 
                                                       geojson=districts_geo,
-                                                      locations='District',
+                                                      locations='District_ID',
                                                       color=data_color,
                                                       range_color=(r_max, r_min),
                                                       color_continuous_scale='spectral_r',
-                                                      featureidkey='properties.NAME_2',
+                                                      featureidkey='properties.DISTRICT_L',
                                                       mapbox_style='light',
                                                       center={"lat": 22, "lon": 82},
                                                       zoom=3.85,
@@ -265,15 +265,21 @@ if len(s_states):
                         r_max = nres[nres.columns[1]].max()
                         r_min = nres[nres.columns[1]].min()
 
+                        # Add state indice
+                        nres['State_ID'] = nres.apply(lambda row: names['States'][row.State.upper()], axis=1)
+
+                        # Dump DF
+                        # print(nres)
+
                         # Use mapbox
                         pex.set_mapbox_access_token(st.secrets['mapbox']['key'])
                         chart = pex.choropleth_mapbox(nres, 
                                                       geojson=states_geo,
-                                                      locations='State',
+                                                      locations='State_ID',
                                                       color=data_color,
                                                       range_color=(r_max, r_min),
                                                       color_continuous_scale='spectral_r',
-                                                      featureidkey='properties.NAME_1',
+                                                      featureidkey='properties.STATE',
                                                       mapbox_style='light',
                                                       center={"lat": 22, "lon": 82},
                                                       zoom=3.85,
